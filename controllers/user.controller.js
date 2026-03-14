@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 import { generateAndPersistTokens } from "../services/generatetoken.js";
 import {
   errorResponseBody,
@@ -13,7 +14,8 @@ import {
   cookieOptions,
 } from "../services/cookieOptions.js";
 
-//Register Controller
+
+// Register Controller
 const register = async (req, res) => {
   try {
     const { name, email, password, role, consent_given } = req.body;
@@ -27,12 +29,20 @@ const register = async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 12);
+
     const user = await User.create({
       name,
       email,
       password_hash,
       role,
       consent_given: consent_given ?? false,
+    });
+
+    // Log activity
+    await ActivityLog.create({
+      user_id: user._id,
+      action: "REGISTER",
+      resource: "User"
     });
 
     return res.status(201).json({
@@ -50,29 +60,39 @@ const register = async (req, res) => {
   }
 };
 
-//Login Controller
+
+// Login Controller
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res
-        .status(401)
-        .json({ ...errorResponseBody, message: "Invalid credentials" });
+      return res.status(401).json({
+        ...errorResponseBody,
+        message: "Invalid credentials",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res
-        .status(401)
-        .json({ ...errorResponseBody, message: "Invalid credentials" });
+      return res.status(401).json({
+        ...errorResponseBody,
+        message: "Invalid credentials",
+      });
     }
 
     const { accessToken, refreshToken } = await generateAndPersistTokens(
       user._id,
       user.role,
     );
+
+    // Log activity
+    await ActivityLog.create({
+      user_id: user._id,
+      action: "LOGIN",
+      resource: "Auth"
+    });
 
     return res
       .status(200)
@@ -96,35 +116,51 @@ const login = async (req, res) => {
   }
 };
 
-//Logout Controller
+
+// Logout Controller
 const logout = async (req, res) => {
   try {
     await User.findByIdAndUpdate(req.user._id, { refresh_token: null });
+
+    // Log activity
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "LOGOUT",
+      resource: "Auth"
+    });
+
     return res
       .status(200)
       .clearCookie("accessToken", cookieOptions)
       .clearCookie("refreshToken", cookieOptions)
-      .json({ ...successResponseBody, message: "Logged out successfully" });
+      .json({
+        ...successResponseBody,
+        message: "Logged out successfully",
+      });
   } catch (error) {
     return res.status(500).json({ ...errorResponseBody, err: error.message });
   }
 };
 
-//Refresh Access Token Controller
+
+// Refresh Token Controller
 const refreshAccessToken = async (req, res) => {
   try {
     const incomingRefreshToken =
       req.cookies?.refreshToken || req.body?.refreshToken;
+
     if (!incomingRefreshToken) {
-      return res
-        .status(401)
-        .json({ ...errorResponseBody, message: "No refresh token provided" });
+      return res.status(401).json({
+        ...errorResponseBody,
+        message: "No refresh token provided",
+      });
     }
 
     const decoded = jwt.verify(
       incomingRefreshToken,
       process.env.REFRESH_TOKEN_SECRET,
     );
+
     const user = await User.findById(decoded._id);
 
     if (!user || user.refresh_token !== incomingRefreshToken) {
@@ -138,6 +174,13 @@ const refreshAccessToken = async (req, res) => {
       user._id,
       user.role,
     );
+
+    // Log activity
+    await ActivityLog.create({
+      user_id: user._id,
+      action: "REFRESH_TOKEN",
+      resource: "Auth"
+    });
 
     return res
       .status(200)
@@ -157,9 +200,17 @@ const refreshAccessToken = async (req, res) => {
   }
 };
 
-//Get Current User Controller
+
+// Get Current User
 const getCurrentUser = async (req, res) => {
   try {
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "GET_PROFILE",
+      resource: "User"
+    });
+
     return res.status(200).json({
       ...successResponseBody,
       message: "User fetched successfully",
@@ -170,15 +221,23 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
-//Update User Controller
+
+// Update User
 const updateUser = async (req, res) => {
   try {
     const { name, consent_given } = req.body;
+
     const user = await User.findByIdAndUpdate(
       req.user._id,
       { name, consent_given },
       { new: true },
     ).select("-password_hash -refresh_token");
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "UPDATE_PROFILE",
+      resource: "User"
+    });
 
     return res.status(200).json({
       ...successResponseBody,
@@ -190,7 +249,8 @@ const updateUser = async (req, res) => {
   }
 };
 
-//Change Password Controller
+
+// Change Password
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -232,10 +292,16 @@ const changePassword = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    user.password = hashedPassword;
+    user.password_hash = hashedPassword;
     user.refresh_token = null;
 
     await user.save();
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "CHANGE_PASSWORD",
+      resource: "User"
+    });
 
     res.clearCookie("accessToken", accessTokenOptions);
     res.clearCookie("refreshToken", refreshTokenOptions);
@@ -244,6 +310,7 @@ const changePassword = async (req, res) => {
       ...successResponseBody,
       message: "Password changed successfully",
     });
+
   } catch (error) {
     return res.status(500).json({
       ...errorResponseBody,
@@ -251,6 +318,7 @@ const changePassword = async (req, res) => {
     });
   }
 };
+
 
 export {
   register,

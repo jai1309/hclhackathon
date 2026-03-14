@@ -1,4 +1,5 @@
 import ProviderPatient from "../models/providerPatient.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 import {
   errorResponseBody,
   successResponseBody,
@@ -25,6 +26,12 @@ const assignPatient = async (req, res) => {
       patient_id,
     });
 
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "ASSIGN_PATIENT",
+      resource: "ProviderPatient",
+    });
+
     return res.status(201).json({
       ...successResponseBody,
       message: "Patient assigned successfully",
@@ -38,9 +45,16 @@ const assignPatient = async (req, res) => {
 const getPatientsByProvider = async (req, res) => {
   try {
     const providerId = req.params.providerId || req.user._id;
+
     const assignments = await ProviderPatient.find({
       provider_id: providerId,
     }).populate("patient_id", "name email");
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "GET_PROVIDER_PATIENTS",
+      resource: "ProviderPatient",
+    });
 
     return res.status(200).json({
       ...successResponseBody,
@@ -55,9 +69,16 @@ const getPatientsByProvider = async (req, res) => {
 const getProvidersByPatient = async (req, res) => {
   try {
     const patientId = req.params.patientId || req.user._id;
+
     const assignments = await ProviderPatient.find({
       patient_id: patientId,
     }).populate("provider_id", "name email");
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "GET_PATIENT_PROVIDERS",
+      resource: "ProviderPatient",
+    });
 
     return res.status(200).json({
       ...successResponseBody,
@@ -81,6 +102,12 @@ const removeAssignment = async (req, res) => {
         .status(404)
         .json({ ...errorResponseBody, message: "Assignment not found" });
     }
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "REMOVE_ASSIGNMENT",
+      resource: "ProviderPatient",
+    });
 
     return res
       .status(200)

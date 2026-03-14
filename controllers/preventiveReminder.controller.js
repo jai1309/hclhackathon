@@ -1,4 +1,5 @@
 import PreventiveReminder from "../models/preventiveReminder.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 import {
   errorResponseBody,
   successResponseBody,
@@ -15,6 +16,12 @@ const createReminder = async (req, res) => {
       due_date,
     });
 
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "CREATE_REMINDER",
+      resource: "PreventiveReminder",
+    });
+
     return res.status(201).json({
       ...successResponseBody,
       message: "Reminder created",
@@ -28,9 +35,16 @@ const createReminder = async (req, res) => {
 const getRemindersByPatient = async (req, res) => {
   try {
     const patientId = req.params.patientId || req.user._id;
+
     const reminders = await PreventiveReminder.find({
       patient_id: patientId,
     }).sort({ due_date: 1 });
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "GET_REMINDERS",
+      resource: "PreventiveReminder",
+    });
 
     return res.status(200).json({
       ...successResponseBody,
@@ -58,6 +72,12 @@ const updateReminder = async (req, res) => {
         .json({ ...errorResponseBody, message: "Reminder not found" });
     }
 
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "UPDATE_REMINDER",
+      resource: "PreventiveReminder",
+    });
+
     return res.status(200).json({
       ...successResponseBody,
       message: "Reminder updated",
@@ -80,6 +100,12 @@ const deleteReminder = async (req, res) => {
         .status(404)
         .json({ ...errorResponseBody, message: "Reminder not found" });
     }
+
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "DELETE_REMINDER",
+      resource: "PreventiveReminder",
+    });
 
     return res
       .status(200)

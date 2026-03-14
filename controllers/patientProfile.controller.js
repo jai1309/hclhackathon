@@ -1,4 +1,5 @@
 import PatientProfile from "../models/patientProfile.model.js";
+import ActivityLog from "../models/activityLog.model.js";
 import {
   errorResponseBody,
   successResponseBody,
@@ -26,6 +27,13 @@ const createPatientProfile = async (req, res) => {
       medical_conditions,
     });
 
+    // Log activity
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "CREATE_PATIENT_PROFILE",
+      resource: "PatientProfile",
+    });
+
     return res.status(201).json({
       ...successResponseBody,
       message: "Patient profile created",
@@ -39,16 +47,25 @@ const createPatientProfile = async (req, res) => {
 const getPatientProfile = async (req, res) => {
   try {
     const userId = req.params.userId || req.user._id;
+
     const profile = await PatientProfile.findOne({ user_id: userId }).populate(
       "user_id",
       "name email",
     );
 
     if (!profile) {
-      return res
-        .status(404)
-        .json({ ...errorResponseBody, message: "Patient profile not found" });
+      return res.status(404).json({
+        ...errorResponseBody,
+        message: "Patient profile not found",
+      });
     }
+
+    // Log activity
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "GET_PATIENT_PROFILE",
+      resource: "PatientProfile",
+    });
 
     return res.status(200).json({
       ...successResponseBody,
@@ -72,10 +89,18 @@ const updatePatientProfile = async (req, res) => {
     );
 
     if (!profile) {
-      return res
-        .status(404)
-        .json({ ...errorResponseBody, message: "Patient profile not found" });
+      return res.status(404).json({
+        ...errorResponseBody,
+        message: "Patient profile not found",
+      });
     }
+
+    // Log activity
+    await ActivityLog.create({
+      user_id: req.user._id,
+      action: "UPDATE_PATIENT_PROFILE",
+      resource: "PatientProfile",
+    });
 
     return res.status(200).json({
       ...successResponseBody,
