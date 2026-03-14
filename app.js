@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import userRouter from "./routes/user.route.js";
-import activityLogRouter from "./routes/activityLog.route.js";
 import healthTipRouter from "./routes/healthTip.route.js";
 import patientProfileRouter from "./routes/patientProfile.route.js";
 import preventiveReminderRouter from "./routes/preventiveReminder.route.js";
@@ -26,7 +25,6 @@ app.use(express.static("public"));
 
 //routes declaration
 app.use("/api/v1/users", userRouter);
-app.use("/api/v1/activity-logs", activityLogRouter);
 app.use("/api/v1/health-tips", healthTipRouter);
 app.use("/api/v1/patient-profile", patientProfileRouter);
 app.use("/api/v1/reminders", preventiveReminderRouter);
